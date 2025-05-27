@@ -1,0 +1,14 @@
+let map = fn(arr, f) {
+   let iter = fn(arr, accumulated) {
+      if (len(arr) == 0) {
+         return accumulated
+      } else {
+         return iter(rest(arr), push(accumulated, f(first(arr))));
+      }
+   };
+   return iter(arr, []);
+};
+
+let arr = ["HI", "HELLO"]
+let add_two = fn(x) { return x + "2" }
+print(map(arr, add_two))

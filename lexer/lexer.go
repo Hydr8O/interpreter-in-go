@@ -90,10 +90,16 @@ func (lexer *Lexer) NextToken() token.Token {
 		nextToken = NewToken(token.LBRACE, lexer.currentChar)
 	case '}':
 		nextToken = NewToken(token.RBRACE, lexer.currentChar)
+	case '"':
+		nextToken.Type = token.STRING
+		nextToken.Literal = lexer.ReadString()
+	case '[':
+		nextToken = NewToken(token.LBRACKET, lexer.currentChar)
+	case ']':
+		nextToken = NewToken(token.RBRACKET, lexer.currentChar)
 	case 0:
 		nextToken.Literal = ""
 		nextToken.Type = token.EOF
-
 	default:
 		if IsLetter(lexer.currentChar) {
 			nextToken.Literal = lexer.ReadIdentifier()
@@ -123,6 +129,17 @@ func (lexer *Lexer) NextToken() token.Token {
 
 	lexer.ReadChar()
 	return nextToken
+}
+
+func (lexer *Lexer) ReadString() string {
+	position := lexer.position + 1
+	for {
+		lexer.ReadChar()
+		if lexer.currentChar == '"' || lexer.currentChar == 0 {
+			break
+		}
+	}
+	return lexer.input[position:lexer.position]
 }
 
 func NewToken(tokenType string, currentChar byte) token.Token {

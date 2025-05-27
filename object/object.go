@@ -8,13 +8,36 @@ import (
 )
 
 const (
+	BUILTIN_OBJECT      = "BUILTIN"
+	STRING_OBJECT       = "STRING"
 	FUNCTION_OBJECT     = "FUNCTION"
 	INTEGER_OBJECT      = "INTEGER"
 	BOOLEAN_OBJECT      = "BOOLEAN"
 	NULL_OBJECT         = "NULL"
 	RETURN_VALUE_OBJECT = "RETURN_VALUE"
 	ERROR_OBJECT        = "ERROR"
+	ARRAY_OBJECT        = "ARRAY"
 )
+
+type Array struct {
+	Elements []Object
+}
+
+func (arrayObject *Array) Type() string { return ARRAY_OBJECT }
+func (arrayObject *Array) Inspect() string {
+	var out bytes.Buffer
+
+	elements := []string{}
+	for _, e := range arrayObject.Elements {
+		elements = append(elements, e.Inspect())
+	}
+
+	out.WriteString("[")
+	out.WriteString(strings.Join(elements, ", "))
+	out.WriteString("]")
+
+	return out.String()
+}
 
 type Error struct {
 	Message string
@@ -98,6 +121,22 @@ type Integer struct {
 
 func (integer *Integer) Inspect() string { return fmt.Sprintf("%d", integer.Value) }
 func (integer *Integer) Type() string    { return INTEGER_OBJECT }
+
+type String struct {
+	Value string
+}
+
+func (string *String) Inspect() string { return string.Value }
+func (string *String) Type() string    { return STRING_OBJECT }
+
+type BuiltinFunction func(args ...Object) Object
+
+type Builtin struct {
+	Fn BuiltinFunction
+}
+
+func (builtin *Builtin) Type() string    { return BUILTIN_OBJECT }
+func (builtin *Builtin) Inspect() string { return "builtin function" }
 
 type Boolean struct {
 	Value bool

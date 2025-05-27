@@ -6,6 +6,9 @@ type Token struct {
 }
 
 const (
+	LBRACKET   = "["
+	RBRACKET   = "]"
+	STRING     = "STRING"
 	ILLEGAL    = "ILLEGAL"
 	EOF        = "EOF"
 	IDENTIFIER = "IDENTIFIER"

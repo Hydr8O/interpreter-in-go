@@ -20,6 +20,8 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 		return Eval(node.Expression, env)
 	case *ast.IntegerLiteral:
 		return &object.Integer{Value: node.Value}
+	case *ast.StringLiteral:
+		return &object.String{Value: node.Value}
 	case *ast.Boolean:
 		if node.Value {
 			return TRUE
@@ -73,19 +75,57 @@ func Eval(node ast.Node, env *object.Environment) object.Object {
 			return args[0]
 		}
 		return ApplyFunction(function, args)
+	case *ast.ArrayLiteral:
+		elements := EvalExpressions(node.Elements, env)
+		if len(elements) == 1 && IsError(elements[0]) {
+			return elements[0]
+		}
+		return &object.Array{Elements: elements}
+	case *ast.IndexExpression:
+		left := Eval(node.Left, env)
+		if IsError(left) {
+			return left
+		}
+		index := Eval(node.Index, env)
+		if IsError(index) {
+			return index
+		}
+		return EvalIndexExpression(left, index)
 	}
 	return nil
 }
 
+func EvalIndexExpression(left, index object.Object) object.Object {
+	switch {
+	case left.Type() == object.ARRAY_OBJECT && index.Type() == object.INTEGER_OBJECT:
+		return EvalArrayIndexExpression(left, index)
+	default:
+		return NewError("index operator not supported: %s", left.Type())
+	}
+}
+
+func EvalArrayIndexExpression(array, index object.Object) object.Object {
+	arrayObject := array.(*object.Array)
+	idx := index.(*object.Integer).Value
+	max := int64(len(arrayObject.Elements) - 1)
+
+	if idx < 0 || idx > max {
+		return NULL
+	}
+	return arrayObject.Elements[idx]
+}
+
 func ApplyFunction(fn object.Object, args []object.Object) object.Object {
-	function, ok := fn.(*object.Function)
-	if !ok {
+	switch fn := fn.(type) {
+	case *object.Function:
+		extendedEnv := ExtendFunctionEnv(fn, args)
+		evaluated := Eval(fn.Body, extendedEnv)
+		return UnwrapReturnValue(evaluated)
+	case *object.Builtin:
+		return fn.Fn(args...)
+	default:
 		return NewError("not a function: %s", fn.Type())
 	}
-
-	extendedEnv := ExtendFunctionEnv(function, args)
-	evaluated := Eval(function.Body, extendedEnv)
-	return UnwrapReturnValue(evaluated)
 }
 
 func ExtendFunctionEnv(fn *object.Function, args []object.Object) *object.Environment {
@@ -120,11 +160,14 @@ func EvalExpressions(exps []ast.Expression, env *object.Environment) []object.Ob
 }
 
 func EvalIdentifier(node *ast.Identifier, env *object.Environment) object.Object {
-	val, ok := env.Get(node.Value)
-	if !ok {
-		return NewError("identifier not found: " + node.Value)
+	if val, ok := env.Get(node.Value); ok {
+		return val
 	}
-	return val
+
+	if builtin, ok := builtins[node.Value]; ok {
+		return builtin
+	}
+	return NewError("identifier not found: " + node.Value)
 }
 
 func EvalIfExpression(ifExpression *ast.IfExpression, env *object.Environment) object.Object {
@@ -203,6 +246,8 @@ func EvalInfixExpression(operator string, left object.Object, right object.Objec
 	switch {
 	case left.Type() == object.INTEGER_OBJECT && right.Type() == object.INTEGER_OBJECT:
 		return EvalIntegerInfixExpression(operator, left, right)
+	case left.Type() == object.STRING_OBJECT && right.Type() == object.STRING_OBJECT:
+		return EvalStringInfixExpression(operator, left, right)
 	case operator == "==":
 		return NativeBoolToBooleanObject(left == right)
 	case operator == "!=":
@@ -237,6 +282,15 @@ func EvalIntegerInfixExpression(operator string, left object.Object, right objec
 	default:
 		return NewError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
 	}
+}
+
+func EvalStringInfixExpression(operator string, left object.Object, right object.Object) object.Object {
+	leftValue := left.(*object.String).Value
+	rightValue := right.(*object.String).Value
+	if operator != "+" {
+		return NewError("unknown operator: %s %s %s", left.Type(), operator, right.Type())
+	}
+	return &object.String{Value: leftValue + rightValue}
 }
 
 func NativeBoolToBooleanObject(input bool) object.Object {
